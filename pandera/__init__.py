@@ -67,13 +67,6 @@ from pandera.engines.pandas_engine import (
 from pandera.schema_inference.pandas import infer_schema
 from pandera.version import __version__
 
-# from pandera.api.pandas import (
-#     Column,
-#     DataFrameSchema,
-#     Index,
-#     MultiIndex,
-#     SeriesSchema,
-# )
 
 
 if platform.system() != "Windows":

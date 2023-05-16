@@ -74,8 +74,9 @@ if pyspark.PYSPARK_INSTALLED:
     INDEX_TYPES.update({pyspark.Index})  # type: ignore [arg-type]
 
 if pyspark_sql.PYSPARK_SQL_INSTALLED:
-    DATAFRAME_TYPES.update({pyspark_sql.DataFrame})
     COLUMN_TYPES: Set[Type] = {Column}
+    DATAFRAME_TYPES.update({pyspark_sql.DataFrame})
+    COLUMN_TYPES.update({pyspark_sql.Column})
 
 if geopandas.GEOPANDAS_INSTALLED:
     DATAFRAME_TYPES.update({geopandas.GeoDataFrame})
