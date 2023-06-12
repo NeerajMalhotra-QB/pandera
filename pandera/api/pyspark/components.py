@@ -7,10 +7,13 @@ import pyspark.sql as ps
 from pandera.api.pyspark.column_schema import ColumnSchema
 from pandera.api.pyspark.error_handler import ErrorHandler
 from pandera.api.pyspark.types import CheckList, PySparkDtypeInputTypes
+from pandera.backends.pyspark.components import ColumnBackend
 
 
 class Column(ColumnSchema):
     """Validate types and properties of DataFrame columns."""
+
+    BACKEND = ColumnBackend()
 
     def __init__(
         self,
@@ -145,7 +148,7 @@ class Column(ColumnSchema):
         :param error_handler: pyspark error handler object to provide the error in a dictionary format.
         :returns: validated DataFrame.
         """
-        return self.get_backend(check_obj).validate(
+        return self.BACKEND.validate(
             check_obj=check_obj,
             schema=self,
             head=head,
@@ -163,9 +166,7 @@ class Column(ColumnSchema):
         :param columns: columns to regex pattern match
         :returns: matching columns
         """
-        return self.get_backend(check_type=ps.DataFrame).get_regex_columns(
-            self, columns
-        )
+        return self.BACKEND.get_regex_columns(self, columns)
 
     def __eq__(self, other):
         if not isinstance(other, self.__class__):

@@ -65,6 +65,14 @@ import pandera.backends.pandas
 from pandera.schema_inference.pandas import infer_schema
 from pandera.version import __version__
 
+# from pandera.api.pandas import (
+#     Column,
+#     DataFrameSchema,
+#     Index,
+#     MultiIndex,
+#     SeriesSchema,
+# )
+
 
 if platform.system() != "Windows":
     # pylint: disable=ungrouped-imports

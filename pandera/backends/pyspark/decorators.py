@@ -1,22 +1,12 @@
 """This module holds the decorators only valid for pyspark"""
-
 import functools
 import warnings
-from enum import Enum
 from typing import List, Type
 
 import pyspark.sql
 
 from pandera.api.pyspark.types import PysparkDefaultTypes
-from pandera.config import CONFIG, ValidationDepth
 from pandera.errors import SchemaError
-
-
-class ValidationScope(Enum):
-    """Indicates whether a check/validator operates at a schema of data level."""
-
-    SCHEMA = "schema"
-    DATA = "data"
 
 
 def register_input_datatypes(
@@ -70,7 +60,7 @@ def register_input_datatypes(
     return wrapper
 
 
-def validate_scope(scope: ValidationScope):
+def validate_scope(params, scope):
     """This decorator decides if a function needs to be run or skipped based on params
 
     :param params: The configuration parameters to which define how pandera has to be used
@@ -81,10 +71,9 @@ def validate_scope(scope: ValidationScope):
     def _wrapper(func):
         @functools.wraps(func)
         def wrapper(self, *args, **kwargs):
-            if scope == ValidationScope.SCHEMA:
-                if CONFIG.validation_depth in (
-                    ValidationDepth.SCHEMA_AND_DATA,
-                    ValidationDepth.SCHEMA_ONLY,
+            if scope == "SCHEMA":
+                if (params["PANDERA_DEPTH"] == "SCHEMA_AND_DATA") or (
+                    params["PANDERA_DEPTH"] == "SCHEMA_ONLY"
                 ):
                     return func(self, *args, **kwargs)
                 else:
@@ -101,10 +90,9 @@ def validate_scope(scope: ValidationScope):
                             if isinstance(value, pyspark.sql.DataFrame):
                                 return value
 
-            elif scope == ValidationScope.DATA:
-                if CONFIG.validation_depth in (
-                    ValidationDepth.SCHEMA_AND_DATA,
-                    ValidationDepth.DATA_ONLY,
+            elif scope == "DATA":
+                if (params["PANDERA_DEPTH"] == "SCHEMA_AND_DATA") or (
+                    params["PANDERA_DEPTH"] == "DATA_ONLY"
                 ):
                     return func(self, *args, **kwargs)
                 else:

@@ -40,7 +40,7 @@ else:
     )
     settings.register_profile(
         "dev",
-        max_examples=3,
+        max_examples=5,
         deadline=None,
         suppress_health_check=suppressed_health_checks,
     )

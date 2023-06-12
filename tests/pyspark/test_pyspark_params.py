@@ -2,31 +2,54 @@
 # pylint:disable=import-outside-toplevel,abstract-method
 
 import pyspark.sql.types as T
-
-from pandera.config import CONFIG, ValidationDepth
-from pandera.pyspark import (
-    Check,
-    DataFrameSchema,
-    Column,
-    DataFrameModel,
-    Field,
-)
 from tests.pyspark.conftest import spark_df
 
 
-class TestPanderaConfig:
+class TestConfigParams:
     """Class to test all the different configs types"""
 
     sample_data = [("Bread", 9), ("Cutter", 15)]
 
-    def test_disable_validation(self, spark, sample_spark_schema):
+    @staticmethod
+    def remove_python_module_cache():
+        """
+        This function removes the imports from the python module cache to re-instantiate the object
+        refer: https://docs.python.org/3/reference/import.html#the-module-cache
+        """
+
+        import sys
+
+        values_to_del = []
+        # Pyspark module cache loads the modules need to rerun the find all instances of case
+        for key in sys.modules:
+            if key.startswith("pandera"):
+                values_to_del.append(key)
+        # Separate loop for delete since removing the module from cache is
+        # a runtime if done in same loop causes runtime error
+        for value in values_to_del:
+            del sys.modules[value]
+
+    def test_disable_validation(self, spark, sample_spark_schema, monkeypatch):
         """This function validates that a none object is loaded if validation is disabled"""
 
-        CONFIG.validation_enabled = False
+        # Need to do imports and schema definition in code to ensure the object is instantiated from scratch
+        self.remove_python_module_cache()
+        monkeypatch.setenv("PANDERA_VALIDATION", "DISABLE")
+
+        import pandera
+        from pandera.pyspark import (
+            DataFrameSchema,
+            Column,
+            DataFrameModel,
+            Field,
+        )
+        from pandera.backends.pyspark.utils import ConfigParams
 
         pandra_schema = DataFrameSchema(
             {
-                "product": Column(T.StringType(), Check.str_startswith("B")),
+                "product": Column(
+                    T.StringType(), pandera.Check.str_startswith("B")
+                ),
                 "price_val": Column(T.IntegerType()),
             }
         )
@@ -37,34 +60,50 @@ class TestPanderaConfig:
             product: T.StringType() = Field(str_startswith="B")
             price_val: T.StringType() = Field()
 
+        params = ConfigParams()
         input_df = spark_df(spark, self.sample_data, sample_spark_schema)
         expected = {
-            "validation_enabled": False,
-            "validation_depth": ValidationDepth.SCHEMA_AND_DATA,
+            "PANDERA_VALIDATION": "DISABLE",
+            "PANDERA_DEPTH": "SCHEMA_AND_DATA",
         }
 
-        assert CONFIG.dict() == expected
+        assert dict(params) == expected
         assert pandra_schema.validate(input_df) is None
         assert TestSchema.validate(input_df) is None
 
-    # pylint:disable=too-many-locals
-    def test_schema_only(self, spark, sample_spark_schema):
+    def test_schema_only(
+        self, spark, sample_spark_schema, monkeypatch
+    ):  # pylint:disable=too-many-locals
         """This function validates that only schema related checks are run not data level"""
-        CONFIG.validation_enabled = True
-        CONFIG.validation_depth = ValidationDepth.SCHEMA_ONLY
+        self.remove_python_module_cache()
+        monkeypatch.setenv("PANDERA_VALIDATION", "ENABLE")
+        monkeypatch.setenv("PANDERA_DEPTH", "SCHEMA_ONLY")
+        # Need to do imports and schema definition in code to ensure the object is instantiated from scratch
 
+        import pandera
+        from pandera.pyspark import (
+            DataFrameSchema,
+            Column,
+            DataFrameModel,
+            Field,
+        )
+        from pandera.backends.pyspark.utils import ConfigParams
+
+        params = ConfigParams()
         pandra_schema = DataFrameSchema(
             {
-                "product": Column(T.StringType(), Check.str_startswith("B")),
+                "product": Column(
+                    T.StringType(), pandera.Check.str_startswith("B")
+                ),
                 "price_val": Column(T.IntegerType()),
             }
         )
 
         expected = {
-            "validation_enabled": True,
-            "validation_depth": ValidationDepth.SCHEMA_ONLY,
+            "PANDERA_VALIDATION": "ENABLE",
+            "PANDERA_DEPTH": "SCHEMA_ONLY",
         }
-        assert CONFIG.dict() == expected
+        assert dict(params) == expected
 
         input_df = spark_df(spark, self.sample_data, sample_spark_schema)
         output_dataframeschema_df = pandra_schema.validate(input_df)
@@ -126,23 +165,38 @@ class TestPanderaConfig:
             == expected_dataframemodel["SCHEMA"]
         )
 
-    # pylint:disable=too-many-locals
-    def test_data_only(self, spark, sample_spark_schema):
+    def test_data_only(
+        self, spark, sample_spark_schema, monkeypatch
+    ):  # pylint:disable=too-many-locals
         """This function validates that only data related checks are run not schema level"""
-        CONFIG.validation_enabled = True
-        CONFIG.validation_depth = ValidationDepth.DATA_ONLY
+        self.remove_python_module_cache()
+        monkeypatch.setenv("PANDERA_VALIDATION", "ENABLE")
+        monkeypatch.setenv("PANDERA_DEPTH", "DATA_ONLY")
 
+        import pandera
+        from pandera.pyspark import (
+            DataFrameSchema,
+            Column,
+            DataFrameModel,
+            Field,
+        )
+        from pandera.backends.pyspark.utils import ConfigParams
+
+        params = ConfigParams()
         pandra_schema = DataFrameSchema(
             {
-                "product": Column(T.StringType(), Check.str_startswith("B")),
+                "product": Column(
+                    T.StringType(), pandera.Check.str_startswith("B")
+                ),
                 "price_val": Column(T.IntegerType()),
             }
         )
+
         expected = {
-            "validation_enabled": True,
-            "validation_depth": ValidationDepth.DATA_ONLY,
+            "PANDERA_VALIDATION": "ENABLE",
+            "PANDERA_DEPTH": "DATA_ONLY",
         }
-        assert CONFIG.dict() == expected
+        assert dict(params) == expected
 
         input_df = spark_df(spark, self.sample_data, sample_spark_schema)
         output_dataframeschema_df = pandra_schema.validate(input_df)
@@ -210,24 +264,38 @@ class TestPanderaConfig:
             == expected_dataframemodel["DATA"]
         )
 
-    # pylint:disable=too-many-locals
-    def test_schema_and_data(self, spark, sample_spark_schema):
+    def test_schema_and_data(
+        self, spark, sample_spark_schema, monkeypatch
+    ):  # pylint:disable=too-many-locals
         """This function validates that both data and schema level checks are validated"""
-        # self.remove_python_module_cache()
-        CONFIG.validation_enabled = True
-        CONFIG.validation_depth = ValidationDepth.SCHEMA_AND_DATA
+        self.remove_python_module_cache()
+        monkeypatch.setenv("PANDERA_VALIDATION", "ENABLE")
+        monkeypatch.setenv("PANDERA_DEPTH", "SCHEMA_AND_DATA")
 
+        import pandera
+        from pandera.pyspark import (
+            DataFrameSchema,
+            Column,
+            DataFrameModel,
+            Field,
+        )
+        from pandera.backends.pyspark.utils import ConfigParams
+
+        params = ConfigParams()
         pandra_schema = DataFrameSchema(
             {
-                "product": Column(T.StringType(), Check.str_startswith("B")),
+                "product": Column(
+                    T.StringType(), pandera.Check.str_startswith("B")
+                ),
                 "price_val": Column(T.IntegerType()),
             }
         )
+
         expected = {
-            "validation_enabled": True,
-            "validation_depth": ValidationDepth.SCHEMA_AND_DATA,
+            "PANDERA_VALIDATION": "ENABLE",
+            "PANDERA_DEPTH": "SCHEMA_AND_DATA",
         }
-        assert CONFIG.dict() == expected
+        assert dict(params) == expected
 
         input_df = spark_df(spark, self.sample_data, sample_spark_schema)
         output_dataframeschema_df = pandra_schema.validate(input_df)
