@@ -62,7 +62,7 @@ PYSPARK_PANDAS_UNSUPPORTED = {
     pandas_engine.Date,
 }
 
-SPARK_VERSION = version.parse(SparkContext().version)
+SPARK_VERSION = version.parse(SparkContext.getOrCreate().version)
 
 if SPARK_VERSION < version.parse("3.3.0"):
     PYSPARK_PANDAS_UNSUPPORTED.add(numpy_engine.Timedelta64)
@@ -293,7 +293,7 @@ def test_nullable(
 
     if version.parse(np.__version__) >= version.parse(
         "1.24.0"
-    ) and SPARK_VERSION <= version.parse("3.3.1"):
+    ) and SPARK_VERSION <= version.parse("3.3.2"):
         # this should raise an error due to pyspark code using numpy.bool,
         # which is deprecated.
         pytest.xfail()
@@ -430,7 +430,7 @@ def test_dtype_coercion(from_dtype, to_dtype, data):
 
     if version.parse(np.__version__) >= version.parse(
         "1.24.0"
-    ) and SPARK_VERSION <= version.parse("3.3.1"):
+    ) and SPARK_VERSION <= version.parse("3.3.2"):
         # this should raise an error due to pyspark code using numpy.bool,
         # which is deprecated.
         pytest.xfail()

@@ -156,6 +156,7 @@ def test_check_function_decorators() -> None:
 
 def test_check_function_decorator_errors() -> None:
     """Test that the check_input and check_output decorators error properly."""
+
     # case 1: checks that the input and output decorators error when different
     # types are passed in and out
     @check_input(DataFrameSchema({"column1": Column(Int)}))
@@ -253,11 +254,12 @@ def test_check_output_coercion_error() -> None:
 
 def test_check_instance_method_decorator_error() -> None:
     """Test error message on methods."""
+
     # pylint: disable-next=missing-class-docstring
     class TestClass:
         @check_input(DataFrameSchema({"column1": Column(Int)}))
         def test_method(self, df):
-            # pylint: disable=missing-function-docstring,no-self-use
+            # pylint: disable=missing-function-docstring
             return df
 
     with pytest.raises(
@@ -440,7 +442,6 @@ def test_check_io() -> None:
 
     # invalid out schema types
     for out_schema in [1, 5.0, "foo", {"foo": "bar"}, ["foo"]]:
-
         # mypy finds correctly the wrong usage
         # pylint: disable=cell-var-from-loop
         @check_io(out=out_schema)  # type: ignore[arg-type]
@@ -822,7 +823,7 @@ def test_check_types_method_args() -> None:
 
     class SomeClass:
         @check_types
-        def regular_method(  # pylint: disable=no-self-use
+        def regular_method(
             self,
             df1: DataFrame[SchemaIn1],
             df2: DataFrame[SchemaIn2],
@@ -891,7 +892,8 @@ def test_check_types_method_args() -> None:
 
 def test_check_types_union_args() -> None:
     """Test that the @check_types decorator works with
-    typing.Union[pandera.typing.DataFrame[S1], pandera.typing.DataFrame[S2]] type inputs/outputs"""
+    typing.Union[pandera.typing.DataFrame[S1], pandera.typing.DataFrame[S2]] type inputs/outputs
+    """
 
     @check_types
     def validate_union(
@@ -976,7 +978,7 @@ def test_coroutines(event_loop: AbstractEventLoop) -> None:
         @check_output(Schema.to_schema())
         @check_input(Schema.to_schema(), "df1")
         @check_io(df1=Schema.to_schema(), out=Schema.to_schema())
-        async def regular_meta_coroutine(  # pylint: disable=no-self-use
+        async def regular_meta_coroutine(
             cls,
             df1: DataFrame[Schema],
         ) -> DataFrame[Schema]:
@@ -1007,7 +1009,7 @@ def test_coroutines(event_loop: AbstractEventLoop) -> None:
         @check_output(Schema.to_schema())
         @check_input(Schema.to_schema(), "df1")
         @check_io(df1=Schema.to_schema(), out=Schema.to_schema())
-        async def regular_coroutine(  # pylint: disable=no-self-use
+        async def regular_coroutine(
             self,
             df1: DataFrame[Schema],
         ) -> DataFrame[Schema]:

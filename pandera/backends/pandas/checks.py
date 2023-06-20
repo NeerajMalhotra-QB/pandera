@@ -4,17 +4,17 @@ from functools import partial
 from typing import Dict, List, Optional, Union, cast
 
 import pandas as pd
-from multimethod import overload, DispatchError
+from multimethod import DispatchError, overload
 
-from pandera.backends.base import BaseCheckBackend
 from pandera.api.base.checks import CheckResult, GroupbyObject
 from pandera.api.checks import Check
 from pandera.api.pandas.types import (
-    is_table,
-    is_field,
-    is_table_or_field,
     is_bool,
+    is_field,
+    is_table,
+    is_table_or_field,
 )
+from pandera.backends.base import BaseCheckBackend
 
 
 class PandasCheckBackend(BaseCheckBackend):
@@ -56,8 +56,13 @@ class PandasCheckBackend(BaseCheckBackend):
         # NOTE: this behavior should be deprecated such that the user deals with
         # pandas groupby objects instead of dicts.
         if groups is None:
-            return dict(list(groupby_obj))  # type: ignore [call-overload]
-        group_keys = set(group_key for group_key, _ in groupby_obj)  # type: ignore [union-attr]
+            return {
+                (k if isinstance(k, bool) else k[0] if len(k) == 1 else k): v
+                for k, v in groupby_obj  # type: ignore [union-attr]
+            }
+        group_keys = set(
+            k[0] if len(k) == 1 else k for k, _ in groupby_obj  # type: ignore [union-attr]
+        )
         invalid_groups = [g for g in groups if g not in group_keys]
         if invalid_groups:
             raise KeyError(

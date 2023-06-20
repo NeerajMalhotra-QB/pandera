@@ -52,6 +52,30 @@ def test_to_schema_and_validate() -> None:
         SchemaLegacy(pd.DataFrame({"a": [1]}))
 
 
+def test_schema_with_bare_types():
+    """
+    Test that DataFrameModel can be defined without the Series/Index generics.
+    """
+
+    class Model(pa.DataFrameModel):
+        a: int
+        b: str
+        c: Any
+        d: float
+
+    expected = pa.DataFrameSchema(
+        name="Model",
+        columns={
+            "a": pa.Column(int),
+            "b": pa.Column(str),
+            "c": pa.Column(),
+            "d": pa.Column(float),
+        },
+    )
+
+    assert expected == Model.to_schema()
+
+
 def test_empty_schema() -> None:
     """Test that DataFrameModel supports empty schemas."""
 
@@ -100,14 +124,17 @@ def test_invalid_annotations() -> None:
     with pytest.raises(pa.errors.SchemaInitError, match=err_msg):
         Missing.to_schema()
 
-    class Invalid(pa.DataFrameModel):
-        a: int
-
-    with pytest.raises(pa.errors.SchemaInitError, match="Invalid annotation"):
-        Invalid.to_schema()
-
     class DummyType:
         pass
+
+    class Invalid(pa.DataFrameModel):
+        a: DummyType
+
+    with pytest.raises(
+        TypeError,
+        match="dtype '<class '.*DummyType'>' not understood",
+    ):
+        Invalid.to_schema()
 
     class InvalidDtype(pa.DataFrameModel):
         d: Series[DummyType]  # type: ignore
@@ -1356,3 +1383,41 @@ def test_repeated_generic() -> None:
         IntYFloatZModel.validate(
             pd.DataFrame({"y": [4.0, 5.0, 6.0], "z": [1, 2, 3]})
         )
+
+
+def test_pandas_fields_metadata():
+    """
+    Test schema and metadata on field
+    """
+
+    class PanderaSchema(pa.DataFrameModel):
+        id: Series[int] = pa.Field(
+            gt=5,
+            metadata={
+                "usecase": ["telco", "retail"],
+                "category": "product_pricing",
+            },
+        )
+        product_name: Series[str] = pa.Field(str_startswith="B")
+        price: Series[float] = pa.Field()
+
+        class Config:
+            name = "product_info"
+            strict = True
+            coerce = True
+            metadata = {"category": "product-details"}
+
+    expected = {
+        "product_info": {
+            "columns": {
+                "id": {
+                    "usecase": ["telco", "retail"],
+                    "category": "product_pricing",
+                },
+                "product_name": None,
+                "price": None,
+            },
+            "dataframe": {"category": "product-details"},
+        }
+    }
+    assert PanderaSchema.get_metadata() == expected

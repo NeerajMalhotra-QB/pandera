@@ -10,11 +10,10 @@ from typing import Dict, Optional, Union
 import pandas as pd
 
 import pandera.errors
-
 from pandera import dtypes
-from pandera.api.pandas.container import DataFrameSchema
-from pandera.api.pandas.components import Column
 from pandera.api.checks import Check
+from pandera.api.pandas.components import Column
+from pandera.api.pandas.container import DataFrameSchema
 from pandera.engines import pandas_engine
 from pandera.schema_statistics import get_dataframe_schema_statistics
 
@@ -62,12 +61,10 @@ def _serialize_check_stats(check_stats, dtype=None):
             # try serializing stat as a string if it's datetime-like,
             # otherwise return original value
             return stat.strftime(DATETIME_FORMAT)
-        elif pandas_engine.Engine.dtype(dtypes.Timedelta).check(
-            dtype
-        ) and hasattr(stat, "delta"):
+        elif pandas_engine.Engine.dtype(dtypes.Timedelta).check(dtype):
             # try serializing stat into an int in nanoseconds if it's
             # timedelta-like, otherwise return original value
-            return stat.delta
+            return getattr(stat, "value", stat)
 
         return stat
 

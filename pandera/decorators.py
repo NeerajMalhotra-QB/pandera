@@ -2,8 +2,8 @@
 import functools
 import inspect
 import sys
-import typing
 import types
+import typing
 from collections import OrderedDict
 from typing import (
     Any,
@@ -24,7 +24,8 @@ import wrapt
 from pydantic import validate_arguments
 
 from pandera import errors
-from pandera.api.pandas import DataFrameSchema, SeriesSchema
+from pandera.api.pandas.array import SeriesSchema
+from pandera.api.pandas.container import DataFrameSchema
 from pandera.api.pandas.model import SchemaModel
 from pandera.error_handlers import SchemaErrorHandler
 from pandera.inspection_utils import (
@@ -682,7 +683,7 @@ def check_types(
 
         if error_handler.collected_errors:
             if len(error_handler.collected_errors) == 1:
-                raise error_handler.collected_errors[0]["error"]  # type: ignore[misc]
+                raise error_handler.collected_errors[0]  # type: ignore[misc]
             raise errors.SchemaErrors(
                 schema=schema,
                 schema_errors=error_handler.collected_errors,
@@ -702,7 +703,6 @@ def check_types(
         args: Tuple[Any, ...],
         kwargs: Dict[str, Any],
     ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
-
         if instance is not None:
             # If the wrapped function is a method -> add "self" as the first positional arg
             args = (instance, *args)

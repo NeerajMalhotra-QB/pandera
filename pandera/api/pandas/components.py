@@ -1,17 +1,12 @@
 """Core pandas schema component specifications."""
 
 import warnings
-from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
+from typing import Any, Dict, Iterable, List, Optional, Tuple, Union, cast
 
 import pandas as pd
 
 import pandera.strategies as st
 from pandera import errors
-from pandera.backends.pandas.components import (
-    ColumnBackend,
-    IndexBackend,
-    MultiIndexBackend,
-)
 from pandera.api.pandas.array import ArraySchema
 from pandera.api.pandas.container import DataFrameSchema
 from pandera.api.pandas.types import CheckList, PandasDtypeInputTypes
@@ -20,8 +15,6 @@ from pandera.dtypes import UniqueSettings
 
 class Column(ArraySchema):
     """Validate types and properties of DataFrame columns."""
-
-    BACKEND = ColumnBackend()
 
     def __init__(
         self,
@@ -36,6 +29,8 @@ class Column(ArraySchema):
         regex: bool = False,
         title: Optional[str] = None,
         description: Optional[str] = None,
+        default: Optional[Any] = None,
+        metadata: Optional[dict] = None,
     ) -> None:
         """Create column validator object.
 
@@ -59,6 +54,8 @@ class Column(ArraySchema):
             regex pattern to apply to multiple columns in a dataframe.
         :param title: A human-readable label for the column.
         :param description: An arbitrary textual description of the column.
+        :param default: The default value for missing values in the column.
+        :param metadata: An optional key value data.
 
         :raises SchemaInitError: if impossible to build schema from parameters
 
@@ -89,6 +86,8 @@ class Column(ArraySchema):
             name=name,
             title=title,
             description=description,
+            default=default,
+            metadata=metadata,
         )
         if (
             name is not None
@@ -102,6 +101,7 @@ class Column(ArraySchema):
         self.required = required
         self.name = name
         self.regex = regex
+        self.metadata = metadata
 
     @property
     def _allow_groupby(self) -> bool:
@@ -123,6 +123,8 @@ class Column(ArraySchema):
             "regex": self.regex,
             "title": self.title,
             "description": self.description,
+            "default": self.default,
+            "metadata": self.metadata,
         }
 
     def set_name(self, name: str):
@@ -161,7 +163,7 @@ class Column(ArraySchema):
             otherwise creates a copy of the data.
         :returns: validated DataFrame.
         """
-        return self.BACKEND.validate(
+        return self.get_backend(check_obj).validate(
             check_obj,
             self,
             head=head,
@@ -180,7 +182,12 @@ class Column(ArraySchema):
         :param columns: columns to regex pattern match
         :returns: matchin columns
         """
-        return self.BACKEND.get_regex_columns(self, columns)
+        # pylint: disable=import-outside-toplevel
+        from pandera.backends.pandas.components import ColumnBackend
+
+        return cast(
+            ColumnBackend, self.get_backend(check_type=pd.DataFrame)
+        ).get_regex_columns(self, columns)
 
     def __eq__(self, other):
         if not isinstance(other, self.__class__):
@@ -243,8 +250,6 @@ class Column(ArraySchema):
 class Index(ArraySchema):
     """Validate types and properties of a DataFrame Index."""
 
-    BACKEND = IndexBackend()
-
     @property
     def names(self):
         """Get index names in the Index schema component."""
@@ -282,7 +287,7 @@ class Index(ArraySchema):
             otherwise creates a copy of the data.
         :returns: validated DataFrame or Series.
         """
-        return self.BACKEND.validate(
+        return self.get_backend(check_obj).validate(
             check_obj,
             self,
             head=head,
@@ -349,8 +354,6 @@ class MultiIndex(DataFrameSchema):
     This class inherits from :class:`~pandera.api.pandas.container.DataFrameSchema` to
     leverage its validation logic.
     """
-
-    BACKEND = MultiIndexBackend()
 
     def __init__(
         self,
@@ -480,7 +483,7 @@ class MultiIndex(DataFrameSchema):
             otherwise creates a copy of the data.
         :returns: validated DataFrame or Series.
         """
-        return self.BACKEND.validate(
+        return self.get_backend(check_obj).validate(
             check_obj,
             schema=self,
             head=head,

@@ -12,7 +12,6 @@ import pandas as pd
 
 from pandera import errors
 from pandera import strategies as st
-from pandera.backends.pandas.container import DataFrameSchemaBackend
 from pandera.api.base.schema import BaseSchema, inferred_schema_guard
 from pandera.api.checks import Check
 from pandera.api.hypotheses import Hypothesis
@@ -29,8 +28,6 @@ N_INDENT_SPACES = 4
 
 class DataFrameSchema(BaseSchema):  # pylint: disable=too-many-public-methods
     """A light-weight pandas DataFrame validator."""
-
-    BACKEND = DataFrameSchemaBackend()
 
     def __init__(
         self,
@@ -49,6 +46,7 @@ class DataFrameSchema(BaseSchema):  # pylint: disable=too-many-public-methods
         unique_column_names: bool = False,
         title: Optional[str] = None,
         description: Optional[str] = None,
+        metadata: Optional[dict] = None,
     ) -> None:
         """Initialize DataFrameSchema validator.
 
@@ -80,6 +78,7 @@ class DataFrameSchema(BaseSchema):  # pylint: disable=too-many-public-methods
         :param unique_column_names: whether or not column names must be unique.
         :param title: A human-readable label for the schema.
         :param description: An arbitrary textual description of the schema.
+        :param metadata: An optional key-value data.
 
         :raises SchemaInitError: if impossible to build schema from parameters
 
@@ -117,6 +116,7 @@ class DataFrameSchema(BaseSchema):  # pylint: disable=too-many-public-methods
 
         if columns is None:
             columns = {}
+
         _validate_columns(columns)
         columns = _columns_renamed(columns)
 
@@ -131,6 +131,7 @@ class DataFrameSchema(BaseSchema):  # pylint: disable=too-many-public-methods
             name=name,
             title=title,
             description=description,
+            metadata=metadata,
         )
 
         self.columns: Dict[Any, "pandera.api.pandas.components.Column"] = (  # type: ignore [name-defined]
@@ -158,6 +159,7 @@ class DataFrameSchema(BaseSchema):  # pylint: disable=too-many-public-methods
         # this attribute is not meant to be accessed by users and is explicitly
         # set to True in the case that a schema is created by infer_schema.
         self._IS_INFERRED = False
+        self.metadata = metadata
 
     @property
     def coerce(self) -> bool:
@@ -212,6 +214,19 @@ class DataFrameSchema(BaseSchema):  # pylint: disable=too-many-public-methods
             )
         return {n: c.dtype for n, c in self.columns.items() if not c.regex}
 
+    @property
+    def get_metadata(self) -> Optional[dict]:
+        """Provide metadata for columns and schema level"""
+        res: Dict[Any, Any] = {"columns": {}}
+        for k in self.columns.keys():
+            res["columns"][k] = self.columns[k].properties["metadata"]
+
+        res["dataframe"] = self.metadata
+
+        meta = {}
+        meta[self.name] = res
+        return meta
+
     def get_dtypes(self, dataframe: pd.DataFrame) -> Dict[str, DataType]:
         """
         Same as the ``dtype`` property, but expands columns where
@@ -225,7 +240,9 @@ class DataFrameSchema(BaseSchema):  # pylint: disable=too-many-public-methods
                 regex_dtype.update(
                     {
                         c: column.dtype
-                        for c in column.BACKEND.get_regex_columns(
+                        for c in column.get_backend(
+                            dataframe
+                        ).get_regex_columns(
                             column,
                             dataframe.columns,
                         )
@@ -249,7 +266,7 @@ class DataFrameSchema(BaseSchema):  # pylint: disable=too-many-public-methods
         self._dtype = pandas_engine.Engine.dtype(value) if value else None
 
     def coerce_dtype(self, check_obj: pd.DataFrame) -> pd.DataFrame:
-        return self.BACKEND.coerce_dtype(check_obj, schema=self)
+        return self.get_backend(check_obj).coerce_dtype(check_obj, schema=self)
 
     def validate(
         self,
@@ -318,6 +335,7 @@ class DataFrameSchema(BaseSchema):  # pylint: disable=too-many-public-methods
         # NOTE: Move this into its own schema-backend variant. This is where
         # the benefits of separating the schema spec from the backend
         # implementation comes in.
+
         if hasattr(check_obj, "dask"):
             # special case for dask dataframes
             if inplace:
@@ -357,7 +375,6 @@ class DataFrameSchema(BaseSchema):  # pylint: disable=too-many-public-methods
         lazy: bool = False,
         inplace: bool = False,
     ) -> pd.DataFrame:
-
         if self._is_inferred:
             warnings.warn(
                 f"This {type(self)} is an inferred schema that hasn't been "
@@ -367,7 +384,7 @@ class DataFrameSchema(BaseSchema):  # pylint: disable=too-many-public-methods
                 UserWarning,
             )
 
-        return self.BACKEND.validate(
+        return self.get_backend(check_obj).validate(
             check_obj,
             schema=self,
             head=head,
@@ -423,6 +440,7 @@ class DataFrameSchema(BaseSchema):  # pylint: disable=too-many-public-methods
             f"name={self.name}, "
             f"ordered={self.ordered}, "
             f"unique_column_names={self.unique_column_names}"
+            f"metadata='{self.metadata}, "
             ")>"
         )
 
@@ -468,10 +486,11 @@ class DataFrameSchema(BaseSchema):  # pylint: disable=too-many-public-methods
             f"{indent}coerce={self.coerce},\n"
             f"{indent}dtype={self._dtype},\n"
             f"{indent}index={index},\n"
-            f"{indent}strict={self.strict}\n"
+            f"{indent}strict={self.strict},\n"
             f"{indent}name={self.name},\n"
             f"{indent}ordered={self.ordered},\n"
-            f"{indent}unique_column_names={self.unique_column_names}\n"
+            f"{indent}unique_column_names={self.unique_column_names},\n"
+            f"{indent}metadata={self.metadata}, \n"
             ")>"
         )
 
@@ -539,10 +558,11 @@ class DataFrameSchema(BaseSchema):  # pylint: disable=too-many-public-methods
             coerce=False,
             dtype=None,
             index=None,
-            strict=False
+            strict=False,
             name=None,
             ordered=False,
-            unique_column_names=False
+            unique_column_names=False,
+            metadata=None,
         )>
 
         .. seealso:: :func:`remove_columns`
@@ -590,10 +610,11 @@ class DataFrameSchema(BaseSchema):  # pylint: disable=too-many-public-methods
             coerce=False,
             dtype=None,
             index=None,
-            strict=False
+            strict=False,
             name=None,
             ordered=False,
-            unique_column_names=False
+            unique_column_names=False,
+            metadata=None,
         )>
 
         .. seealso:: :func:`add_columns`
@@ -652,10 +673,11 @@ class DataFrameSchema(BaseSchema):  # pylint: disable=too-many-public-methods
             coerce=False,
             dtype=None,
             index=None,
-            strict=False
+            strict=False,
             name=None,
             ordered=False,
-            unique_column_names=False
+            unique_column_names=False,
+            metadata=None,
         )>
 
         .. seealso:: :func:`rename_columns`
@@ -715,10 +737,11 @@ class DataFrameSchema(BaseSchema):  # pylint: disable=too-many-public-methods
             coerce=False,
             dtype=None,
             index=None,
-            strict=False
+            strict=False,
             name=None,
             ordered=False,
-            unique_column_names=False
+            unique_column_names=False,
+            metadata=None,
         )>
 
         """
@@ -797,10 +820,11 @@ class DataFrameSchema(BaseSchema):  # pylint: disable=too-many-public-methods
             coerce=False,
             dtype=None,
             index=None,
-            strict=False
+            strict=False,
             name=None,
             ordered=False,
-            unique_column_names=False
+            unique_column_names=False,
+            metadata=None,
         )>
 
         .. seealso:: :func:`update_column`
@@ -875,10 +899,11 @@ class DataFrameSchema(BaseSchema):  # pylint: disable=too-many-public-methods
             coerce=False,
             dtype=None,
             index=None,
-            strict=False
+            strict=False,
             name=None,
             ordered=False,
-            unique_column_names=False
+            unique_column_names=False,
+            metadata=None,
         )>
 
         .. note:: If an index is present in the schema, it will also be
@@ -941,10 +966,11 @@ class DataFrameSchema(BaseSchema):  # pylint: disable=too-many-public-methods
             coerce=False,
             dtype=None,
             index=<Schema Index(name=category, type=DataType(str))>,
-            strict=False
+            strict=False,
             name=None,
             ordered=False,
-            unique_column_names=False
+            unique_column_names=False,
+            metadata=None,
         )>
 
         If you have an existing index in your schema, and you would like to
@@ -977,10 +1003,11 @@ class DataFrameSchema(BaseSchema):  # pylint: disable=too-many-public-methods
                 name=None,
                 ordered=True
             )>,
-            strict=False
+            strict=False,
             name=None,
             ordered=False,
-            unique_column_names=False
+            unique_column_names=False,
+            metadata=None,
         )>
 
         .. seealso:: :func:`reset_index`
@@ -1074,10 +1101,11 @@ class DataFrameSchema(BaseSchema):  # pylint: disable=too-many-public-methods
             coerce=False,
             dtype=None,
             index=None,
-            strict=False
+            strict=False,
             name=None,
             ordered=False,
-            unique_column_names=False
+            unique_column_names=False,
+            metadata=None,
         )>
 
         This reclassifies an index (or indices) as a column (or columns).
@@ -1104,10 +1132,11 @@ class DataFrameSchema(BaseSchema):  # pylint: disable=too-many-public-methods
             coerce=False,
             dtype=None,
             index=<Schema Index(name=unique_id2, type=DataType(str))>,
-            strict=False
+            strict=False,
             name=None,
             ordered=False,
-            unique_column_names=False
+            unique_column_names=False,
+            metadata=None,
         )>
 
         .. seealso:: :func:`set_index`

@@ -42,6 +42,8 @@ class BaseFieldInfo:
         "dtype_kwargs",
         "title",
         "description",
+        "default",
+        "metadata",
     )
 
     def __init__(
@@ -56,6 +58,8 @@ class BaseFieldInfo:
         dtype_kwargs: Optional[Dict[str, Any]] = None,
         title: Optional[str] = None,
         description: Optional[str] = None,
+        default: Optional[Any] = None,
+        metadata: Optional[dict] = None,
     ) -> None:
         self.checks = to_checklist(checks)
         self.nullable = nullable
@@ -68,6 +72,8 @@ class BaseFieldInfo:
         self.dtype_kwargs = dtype_kwargs
         self.title = title
         self.description = description
+        self.default = default
+        self.metadata = metadata
 
     @property
     def name(self) -> str:
@@ -103,6 +109,9 @@ class BaseFieldInfo:
 
     def __set__(self, instance: Any, value: Any) -> None:  # pragma: no cover
         raise AttributeError(f"Can't set the {self.original_name} field.")
+
+    def __get_metadata__(self):
+        return self.metadata
 
 
 class BaseCheckInfo:  # pylint:disable=too-few-public-methods
